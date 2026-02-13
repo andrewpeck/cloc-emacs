@@ -47,10 +47,8 @@
 ;;; Usage:
 
 ;; M-x `cloc'
-;; - Interactive function to run the executable "cloc" over all buffers with
-;; pathname specified by a regex.
-;; - If a prefix argument or a blank regex is given, the current buffer is
-;; "cloc'd".
+;; - Interactive function to run the executable "cloc" on current buffer.
+;; - If a prefix argument is given, query for a regex and cloc on all matching buffers.
 ;; - cloc's entire summary output is given in the messages buffer.
 
 ;; ESC-: `cloc-get-results-as-plists'
@@ -58,7 +56,7 @@
 ;; - Each plist contains as a property the number of files analyzed, the blank
 ;; lines, the code lines, comment lines, etc. for a given language in the range
 ;; of files tested.
-;; - If prefix-given is set to true, this runs on the current buffer. If not,
+;; - If find-by-regex is set to true, this runs on the current buffer. If not,
 ;; and a regex is given, it will search file-visiting buffers for file paths
 ;; matching the regex. If the regex is nil, it will prompt for a regex; putting
 ;; in a blank there will default to the current buffer.
@@ -183,10 +181,10 @@ killed when the macro finishes."
          ,body-in-tmp))))
 (put 'cloc-get-temp-buffer-ref 'lisp-indent-function 1)
 
-(defun cloc-get-output (prefix-given be-quiet &optional regex)
+(defun cloc-get-output (current-only be-quiet &optional regex)
   "Helper function to get cloc output for a given set of buffers.
 
-If PREFIX-GIVEN is non-nil, get cloc output for the current buffer.
+If CURRENT-ONLY is nil, get cloc output for the current buffer.
 
 BE-QUIET says whether to output in CSV format, and REGEX is the optional
 regex to search through file paths with. If used programmatically, be
@@ -196,7 +194,7 @@ aware that it will query for a regex if one is not provided by argument."
     (error (concat "cloc not installed. Download it at " cloc-url " or through your
 distribution's package manager.")))
 
-  (if prefix-given
+  (if current-only
       ;; if prefix given, send current buffer to cloc by stdin
       (cloc-get-temp-buffer-ref tmp-buf
         (apply
@@ -312,12 +310,12 @@ Return a plist representing a cloc analysis."
     out-plist))
 
 ;;;###autoload
-(defun cloc-get-results-as-plists (prefix-given &optional regex)
+(defun cloc-get-results-as-plists (&optional find-by-regex regex)
   "Get output of cloc results as a list of plists.
 
 Each plist contains as a property the number of files analyzed, the
 blank lines, the code lines, comment lines, etc. for a given language in
-the range of files tested. If PREFIX-GIVEN is set to true, this runs on
+the range of files tested. If FIND-BY-REGEX is set to true, this runs on
 the current buffer. If not, and REGEX is given, it will search
 file-visiting buffers for file paths matching the regex. If the regex is
 nil, it will prompt for a regex; putting in a blank there will default
@@ -327,22 +325,24 @@ to the current buffer."
    (cl-mapcar
     #'cloc-get-line-as-plist
     ;; first two lines are blank line and csv header, so discard
-    (nthcdr 2 (split-string (cloc-get-output prefix-given t regex) "\n")))))
+    (nthcdr 2 (split-string (cloc-get-output find-by-regex t regex) "\n")))))
 
 (defun cloc-remove-carriage-return (str)
   "Remove carriage return from STR."
   (replace-regexp-in-string "" "" str))
 
 ;;;###autoload
-(defun cloc (prefix-given)
+(defun cloc (prefix)
   "Run the executable \"cloc\" over file-visiting buffers.
 
-If PREFIX-GIVEN is true or a blank regex is given, the
-current buffer is \"cloc'd\". cloc's entire summary output is given in the
-messages buffer."
+If PREFIX is true, prompt for a regex of buffers.
+
+If PREFIX is nil, use current buffer only.
+
+cloc's entire summary output is given in the messages buffer."
   (interactive "P")
-  (message
-   "%s" (cloc-remove-carriage-return (cloc-get-output prefix-given nil))))
+  (message "%s" (cloc-remove-carriage-return
+                 (cloc-get-output (not prefix) nil))))
 
 (provide 'cloc)
 

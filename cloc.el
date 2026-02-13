@@ -5,7 +5,7 @@
 
 ;; Author: Danny McClanahan <danieldmcclanahan@gmail.com>
 ;; Version: 2015.09.12
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "26.1"))
 ;; Package-Version: 0.1
 ;; Keywords: cloc, count, source, code, lines, tools
 ;; URL: https://github.com/andrewpeck/cloc-emacs
@@ -66,6 +66,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'subr-x)
 
 (defgroup cloc nil
   "An interface to 'cloc'."
@@ -99,25 +100,38 @@ BUFS-TO-CLOC. Return the command output as a string."
   (let ((match (string-match "\\.[^\\.]+\\'" filename)))
     (if match (match-string 0 filename) nil)))
 
-(defun cloc-is-tramp-or-virtual-file (regex buf)
-  "Determine whether buffer BUF corresponds with virtual file matching REGEX."
-  (let ((buf-path (buffer-file-name buf)))
-    (and
-     (not (string= (substring (buffer-name buf) 0 1) " "))
-     (or (and
-          (not buf-path)
-          (string-match-p regex (buffer-name buf)))
-         (and
-          buf-path
-          (string-match-p regex buf-path)
-          (file-remote-p buf-path))))))
+(defun cloc-is-tramp-or-virtual-file (buf)
+  "Determine whether buffer BUF is a tramp or virtual file."
+  (and
+   (buffer-file-name buf)
+   (not (cloc-is-real-file buf))))
 
-(defun cloc-is-real-file (regex buf)
+(defun cloc-is-real-file (buf)
   "Determine whether buffer BUF corresponds with real file matching REGEX."
-  (let ((buf-path (buffer-file-name buf)))
-    (and buf-path
-         (string-match-p regex buf-path)
-         (not (file-remote-p buf-path 'host)))))
+  (when-let* ((buf-path (buffer-file-name buf)))
+    (not (file-remote-p buf-path 'host))))
+
+(defun cloc-buffer-matches-regex (buf regex-str)
+  "Check if BUF matches REGEX-STR."
+  (when-let* ((buf (buffer-file-name buf)))
+    (string-match-p regex-str buf)))
+
+(defun cloc-get-buffers-matching-regex (regex-str)
+  "Get all buffers matching REGEX-STR."
+  (thread-last
+    (buffer-list)
+    (cl-remove-if-not
+     (lambda (b) (cloc-buffer-matches-regex b regex-str)))))
+
+(defun cloc-make-tmp-file (buf)
+  "Write a temp copy of BUF to disk.
+
+Useful if BUF is remote and cannot be read by cloc."
+  (let* ((extension (cloc-get-extension (buffer-name buf)))
+         (tmp-file (make-temp-file "cloc" nil extension)))
+    (with-current-buffer buf
+      (write-region nil nil tmp-file))
+    tmp-file))
 
 (defun cloc-get-buffers-with-regex (regex-str)
   "Loop through all open buffers for buffers visiting files matching REGEX-STR.
@@ -129,21 +143,24 @@ have been created in the temporary area (and which should be destroyed by the
 caller of this function). An additional property :is-many is always set to t on
 the returned list so that a caller can determine whether a list was produced by
 this function."
-  (cl-loop for buf in (buffer-list)
-           with ret-list = nil
-           with tmp-list = nil
-           do (cond
-               ((cloc-is-real-file regex-str buf)
-                (cl-pushnew (buffer-file-name buf) 'ret-list))
-               ((cloc-is-tramp-or-virtual-file regex-str buf)
-                (let* ((extension (cloc-get-extension (buffer-name buf)))
-                       (tmp-file (make-temp-file "cloc" nil extension)))
-                  (with-current-buffer buf
-                    (write-region nil nil tmp-file))
-                  (cl-pushnew tmp-file 'ret-list)
-                  (cl-pushnew tmp-file 'tmp-list ))))
-           finally (return
-                    (list :files ret-list :tmp-files tmp-list :is-many t))))
+
+  (let ((matching-buffers (cloc-get-buffers-matching-regex regex-str))
+        (ret-list nil)
+        (tmp-list nil))
+
+    (setq tmp-list
+          (mapcar #'cloc-make-tmp-file
+                  (cl-remove-if-not #'cloc-is-tramp-or-virtual-file
+                                    matching-buffers)))
+
+    (setq ret-list
+          (append tmp-list
+                  (mapcar #'buffer-file-name
+                          (cl-remove-if-not #'cloc-is-real-file matching-buffers))))
+
+    (list :files ret-list
+          :tmp-files tmp-list
+          :is-many t)))
 
 (defconst cloc-url "https://cloc.sourceforge.net"
   "Url pointing to cloc's project page.")

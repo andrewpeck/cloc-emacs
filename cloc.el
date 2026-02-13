@@ -234,13 +234,6 @@ distribution's package manager.")))
                (plist-get buffers-to-cloc :tmp-files))
       result-into-list)))
 
-(defun cloc-get-first-n-of-list (n the-list)
-  "Get first N elements of THE-LIST as another list.
-1 <= n <= (length THE-LIST)."
-  (cl-loop for item in the-list
-           for x from 1 upto n
-           collect item))
-
 (defun cloc-get-line-as-plist (line)
   "Helper function to convert a CSV-formatted LINE of cloc output.
 

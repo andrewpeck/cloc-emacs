@@ -5,7 +5,7 @@
 
 ;; Author: Danny McClanahan <danieldmcclanahan@gmail.com>
 ;; Version: 2015.09.12
-;; Package-Requires: ((emacs "26.1"))
+;; Package-Requires: ((emacs "28.1"))
 ;; Package-Version: 0.1
 ;; Keywords: cloc, count, source, code, lines, tools
 ;; URL: https://github.com/andrewpeck/cloc-emacs
@@ -327,10 +327,6 @@ to the current buffer."
     ;; first two lines are blank line and csv header, so discard
     (nthcdr 2 (split-string (cloc-get-output find-by-regex t regex) "\n")))))
 
-(defun cloc-remove-carriage-return (str)
-  "Remove carriage return from STR."
-  (replace-regexp-in-string "" "" str))
-
 ;;;###autoload
 (defun cloc (prefix)
   "Run the executable \"cloc\" over file-visiting buffers.
@@ -339,10 +335,11 @@ If PREFIX is true, prompt for a regex of buffers.
 
 If PREFIX is nil, use current buffer only.
 
-cloc's entire summary output is given in the messages buffer."
+cloc's entire summary output is given in a *cloc* temp buffer."
   (interactive "P")
-  (message "%s" (cloc-remove-carriage-return
-                 (cloc-get-output (not prefix) nil))))
+  (with-output-to-temp-buffer "*cloc*"
+    (princ "\n")
+    (princ (string-replace "" "" (cloc-get-output (not prefix) nil)))))
 
 (provide 'cloc)
 

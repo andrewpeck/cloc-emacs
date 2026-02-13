@@ -93,11 +93,6 @@ BUFS-TO-CLOC. Return the command output as a string."
    (if (eq bufs-to-cloc t) (list (concat "--stdin-name=" (buffer-name)) "-")
      bufs-to-cloc)))
 
-(defun cloc-get-extension (filename)
-  "Return the extension of FILENAME (.h, .c, .mp3, etc), else return nil."
-  (let ((match (string-match "\\.[^\\.]+\\'" filename)))
-    (if match (match-string 0 filename) nil)))
-
 (defun cloc-is-tramp-or-virtual-file (buf)
   "Determine whether buffer BUF is a tramp or virtual file."
   (and
@@ -125,8 +120,8 @@ BUFS-TO-CLOC. Return the command output as a string."
   "Write a temp copy of BUF to disk.
 
 Useful if BUF is remote and cannot be read by cloc."
-  (let* ((extension (cloc-get-extension (buffer-name buf)))
-         (tmp-file (make-temp-file "cloc" nil extension)))
+  (let* ((extension (file-name-extension (buffer-name buf)))
+         (tmp-file (make-temp-file "cloc" nil (concat "." extension))))
     (with-current-buffer buf
       (write-region nil nil tmp-file))
     tmp-file))

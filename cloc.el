@@ -1,3 +1,4 @@
+;; -*- lexical-binding: t; -*-
 ;;; cloc.el --- count lines of code over emacs buffers
 ;; This file is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -13,6 +14,7 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ;; Copyright 2015 Danny McClanahan
+;; Copyright 2026 Andrew Peck
 
 ;; Author: Danny McClanahan <danieldmcclanahan@gmail.com>
 ;; Version: 2015.09.12
@@ -144,14 +146,14 @@ this function."
            with tmp-list = nil
            do (cond
                ((cloc-is-real-file regex-str buf)
-                (add-to-list 'ret-list (buffer-file-name buf)))
+                (cl-pushnew (buffer-file-name buf) 'ret-list))
                ((cloc-is-tramp-or-virtual-file regex-str buf)
                 (let* ((extension (cloc-get-extension (buffer-name buf)))
                        (tmp-file (make-temp-file "cloc" nil extension)))
                   (with-current-buffer buf
                     (write-region nil nil tmp-file))
-                  (add-to-list 'ret-list tmp-file)
-                  (add-to-list 'tmp-list tmp-file))))
+                  (cl-pushnew tmp-file 'ret-list)
+                  (cl-pushnew tmp-file 'tmp-list ))))
            finally (return
                     (list :files ret-list :tmp-files tmp-list :is-many t))))
 

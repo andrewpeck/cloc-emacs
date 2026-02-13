@@ -1,30 +1,17 @@
-;; -*- lexical-binding: t; -*-
-;;; cloc.el --- count lines of code over emacs buffers
-;; This file is free software; you can redistribute it and/or modify
-;; it under the terms of the GNU General Public License as published by
-;; the Free Software Foundation; either version 3, or (at your option)
-;; any later version.
-
-;; This file is distributed in the hope that it will be useful,
-;; but WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-;; GNU General Public License for more details.
-
-;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;;; cloc.el --- Count lines of code in buffers -*- lexical-binding: t; -*-
 
 ;; Copyright 2015 Danny McClanahan
 ;; Copyright 2026 Andrew Peck
 
 ;; Author: Danny McClanahan <danieldmcclanahan@gmail.com>
 ;; Version: 2015.09.12
-;; Package-Requires: ((cl-lib "0.5"))
+;; Package-Requires: ((emacs "24.3"))
 ;; Package-Version: 0.1
-;; Keywords: cloc, count, source, code, lines
-;; URL: https://github.com/cosmicexplorer/cloc-emacs
-
+;; Keywords: cloc, count, source, code, lines, tools
+;; URL: https://github.com/andrewpeck/cloc-emacs
+;;
 ;; This file is not part of GNU Emacs.
-
+;;
 ;; This program is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
@@ -40,7 +27,7 @@
 
 ;;; Commentary:
 
-;; This is a small attempt at cloc integration for Emacs. The functionality is
+;; This is a small attempt at cloc integration. The functionality is
 ;; exposed through two functions: cloc, an interactive function which performs
 ;; a search through all buffers whose filepaths match the given regex (or the
 ;; current buffer, as desired), and counts lines of code in them. It also
@@ -48,7 +35,7 @@
 ;; the same thing, but parses and organizes it all into a list of plists for
 ;; easier analysis.
 
-;; cloc will search over all buffers, including those which do not visit files,
+;; Cloc will search over all buffers, including those which do not visit files,
 ;; and tramp buffers, but if the buffer is not visiting a file (and therefore
 ;; does not have a pathname), cloc will only be able to match the regex to the
 ;; buffer's buffer-name.
@@ -87,16 +74,20 @@
 
 (defcustom cloc-use-3rd-gen nil
   "Whether or not to use cloc's third-generation language output option."
+  :type 'boolean
   :group 'cloc)
 
 (defcustom cloc-executable-location (executable-find "cloc")
   "Location of cloc executable."
+  :type 'string
   :group 'cloc)
 
 (defun cloc-format-command (be-quiet bufs-to-cloc)
-  "Format the \"cloc\" command according to BE-QUIET and the defcustom
+  "Format the \"cloc\" command.
+
+Command will be formatteed according to BE-QUIET and the defcustom
 CLOC-USE-3RD-GEN, and run the command on the list of strings held in
-BUFFERS-TO-CLOC. Return the command output as a string."
+BUFS-TO-CLOC. Return the command output as a string."
   (append
    (when be-quiet (list "--quiet" "--csv"))
    (when cloc-use-3rd-gen (list "--3"))
@@ -132,8 +123,8 @@ BUFFERS-TO-CLOC. Return the command output as a string."
          (not (string-match-p cloc-tramp-regex-str buf-path)))))
 
 (defun cloc-get-buffers-with-regex (regex-str)
-  "Loop through all open buffers for buffers visiting files whose paths match
-REGEX. If the file is not visiting a buffer (or is over a tramp connection), but
+  "Loop through all open buffers for buffers visiting files matching REGEX-STR.
+If the file is not visiting a buffer (or is over a tramp connection), but
 its (buffer-name) matches REGEX, the file is written out to a temporary area. A
 plist is returned, with :files set to a list of the files which correspond to
 open buffers matching REGEX, and :tmp-files set to a list of the files which
@@ -161,6 +152,15 @@ this function."
   "Url pointing to cloc's project page.")
 
 (defmacro cloc-get-temp-buffer-ref (tmp-buf-name body-in-cur body-in-tmp)
+  "Create a temporary buffer and evaluate two bodies with convenient access to it.
+
+TMP-BUF-NAME is bound to the temporary buffer object. BODY-IN-CUR is
+evaluated with the original current buffer active (while the temp buffer
+exists), allowing that code to refer to or modify the temp buffer via
+TMP-BUF-NAME. BODY-IN-TMP is then evaluated with the current buffer set
+to the temporary buffer; its value is returned. The temporary buffer is
+killed when the macro finishes."
+
   (let ((cur-buf-sym (cl-gensym)))
     `(let ((,cur-buf-sym (current-buffer)))
        (with-temp-buffer
@@ -170,21 +170,23 @@ this function."
 (put 'cloc-get-temp-buffer-ref 'lisp-indent-function 1)
 
 (defun cloc-get-output (prefix-given be-quiet &optional regex)
-  "This is a helper function to get cloc output for a given set of buffers or
-the current buffer (if PREFIX-GIVEN is non-nil), as desired. BE-QUIET says
-whether to output in CSV format, and REGEX is the optional regex to search
-through file paths with. If used programmatically, be aware that it will query
-for a regex if one is not provided by argument."
+  "Helper function to get cloc output for a given set of buffers.
+
+If PREFIX-GIVEN is non-nil, get cloc output for the current buffer.
+
+BE-QUIET says whether to output in CSV format, and REGEX is the optional
+regex to search through file paths with. If used programmatically, be
+aware that it will query for a regex if one is not provided by argument."
   (if cloc-executable-location
       (if prefix-given
           ;; if prefix given, send current buffer to cloc by stdin
           (cloc-get-temp-buffer-ref tmp-buf
             (apply
-              #'call-process-region
-              (append
-               (list (point-min) (point-max) cloc-executable-location
-                     nil tmp-buf nil)
-               (cloc-format-command be-quiet t)))
+             #'call-process-region
+             (append
+              (list (point-min) (point-max) cloc-executable-location
+                    nil tmp-buf nil)
+              (cloc-format-command be-quiet t)))
             (buffer-string))
         ;; if prefix given, cloc current buffer; don't ask for regex
         (let* ((regex-str
@@ -212,8 +214,8 @@ for a regex if one is not provided by argument."
                         (buffer-string))
                     "No filenames were found matching regex."))))
           ;; cleanup!
-          (cl-mapcan (lambda (f) (delete-file f))
-                     (plist-get buffers-to-cloc :tmp-files))
+          (cl-mapc (lambda (f) (delete-file f))
+                   (plist-get buffers-to-cloc :tmp-files))
           result-into-list))
     (concat "cloc not installed. Download it at " cloc-url " or through your
 distribution's package manager.")))
@@ -226,8 +228,9 @@ distribution's package manager.")))
            collect item))
 
 (defun cloc-get-line-as-plist (line)
-  "This is a helper function to convert a CSV-formatted LINE of cloc output into
-a plist representing a cloc analysis."
+  "Helper function to convert a CSV-formatted LINE of cloc output.
+
+Return a plist representing a cloc analysis."
   (let ((out-plist nil))
     (cl-loop for str-pos from 0 upto (1- (length line))
              with prev-str-pos = 0
@@ -294,27 +297,31 @@ a plist representing a cloc analysis."
 
 ;;;###autoload
 (defun cloc-get-results-as-plists (prefix-given &optional regex)
-  "Get output of cloc results as a list of plists. Each plist contains as a
-property the number of files analyzed, the blank lines, the code lines, comment
-lines, etc. for a given language in the range of files tested. If PREFIX-GIVEN
-is set to true, this runs on the current buffer. If not, and REGEX is given,
-it will search file-visiting buffers for file paths matching the regex. If the
-regex is nil, it will prompt for a regex; putting in a blank there will default
+  "Get output of cloc results as a list of plists.
+
+Each plist contains as a property the number of files analyzed, the
+blank lines, the code lines, comment lines, etc. for a given language in
+the range of files tested. If PREFIX-GIVEN is set to true, this runs on
+the current buffer. If not, and REGEX is given, it will search
+file-visiting buffers for file paths matching the regex. If the regex is
+nil, it will prompt for a regex; putting in a blank there will default
 to the current buffer."
   (cl-remove-if
-   #'not      ; remove nils which sometimes appear for some reason
+   #'not                    ; remove nils which sometimes appear for some reason
    (cl-mapcar
     #'cloc-get-line-as-plist
     ;; first two lines are blank line and csv header, so discard
     (nthcdr 2 (split-string (cloc-get-output prefix-given t regex) "\n")))))
 
 (defun cloc-remove-carriage-return (str)
+  "Remove carriage return from STR."
   (replace-regexp-in-string "" "" str))
 
 ;;;###autoload
 (defun cloc (prefix-given)
-  "Run the executable \"cloc\" over file-visiting buffers with pathname
-specified by a regex. If PREFIX-GIVEN is true or a blank regex is given, the
+  "Run the executable \"cloc\" over file-visiting buffers.
+
+If PREFIX-GIVEN is true or a blank regex is given, the
 current buffer is \"cloc'd\". cloc's entire summary output is given in the
 messages buffer."
   (interactive "P")

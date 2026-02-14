@@ -158,6 +158,64 @@ this function."
 (defconst cloc-url "https://cloc.sourceforge.net"
   "Url pointing to cloc's project page.")
 
+(defun cloc-get-output-current (&optional be-quiet)
+  "Run cloc on current buffer. Return a string with the cloc result.
+
+BE-QUIET is passed to cloc."
+
+  (let ((src-buffer (current-buffer)))
+    (with-temp-buffer
+      (let ((tmp-buffer (current-buffer)))
+        (with-current-buffer src-buffer
+          ;; if current-buffer only given, send current buffer to cloc by stdin
+          (apply #'call-process-region
+                 (append
+                  (list (point-min) (point-max)  ; range
+                        cloc-executable-location ; executable
+                        nil                      ; don't delete region
+                        tmp-buffer      ; insert stdout into temp buffer
+                        nil)            ; no display
+                  (cloc-format-command be-quiet t)))))
+      (buffer-string))))
+
+(defun cloc-get-output-regex (be-quiet regex)
+  "Run cloc on all buffers matching regex.
+
+Return a string with the cloc result.
+
+if REGEX is not supplied, query to get one.
+
+BE-QUIET is passed to cloc."
+
+  (let* ((regex-str
+          (or regex (read-regexp "file path regex: ")))
+         (buffers-to-cloc
+          ;; if blank string given, then assume the current file
+          ;; name was what was intended.
+          (if (string= regex-str "")
+              (list (buffer-file-name))
+            (cloc-get-buffers-with-regex regex-str)))
+         ;; return list so we can tell the difference between an
+         ;; invalid regexp versus a real result, even though the
+         ;; list always has only one element
+         (result-into-list
+          ;; check if list is result of cloc-get-buffers-with-regex
+          (let ((cloc-bufs-list
+                 (if (not (plist-get buffers-to-cloc :is-many))
+                     buffers-to-cloc
+                   (plist-get buffers-to-cloc :files))))
+            (if cloc-bufs-list
+                (with-temp-buffer
+                  (apply
+                   #'call-process cloc-executable-location nil t nil
+                   (cloc-format-command be-quiet cloc-bufs-list))
+                  (buffer-string))
+              "No filenames were found matching regex."))))
+    ;; cleanup!
+    (cl-mapc (lambda (f) (delete-file f))
+             (plist-get buffers-to-cloc :tmp-files-to-rm))
+    result-into-list))
+
 (defun cloc-get-output (current-only be-quiet &optional regex)
   "Helper function to get cloc output for a given set of buffers.
 
@@ -172,51 +230,8 @@ aware that it will query for a regex if one is not provided by argument."
 distribution's package manager.")))
 
   (if current-only
-      ;; current only
-      (let ((src-buffer (current-buffer)))
-        (with-temp-buffer
-          (let ((tmp-buffer (current-buffer)))
-            (with-current-buffer src-buffer
-              ;; if current-buffer only given, send current buffer to cloc by stdin
-              (apply #'call-process-region
-                     (append
-                      (list (point-min) (point-max)  ; range
-                            cloc-executable-location ; executable
-                            nil                      ; don't delete region
-                            tmp-buffer               ; insert stdout into temp buffer
-                            nil)                     ; no display
-                      (cloc-format-command be-quiet t)))))
-          (buffer-string)))
-
-    ;; else query for regex
-    (let* ((regex-str
-            (or regex (read-regexp "file path regex: ")))
-           (buffers-to-cloc
-            ;; if blank string given, then assume the current file
-            ;; name was what was intended.
-            (if (string= regex-str "")
-                (list (buffer-file-name))
-              (cloc-get-buffers-with-regex regex-str)))
-           ;; return list so we can tell the difference between an
-           ;; invalid regexp versus a real result, even though the
-           ;; list always has only one element
-           (result-into-list
-            ;; check if list is result of cloc-get-buffers-with-regex
-            (let ((cloc-bufs-list
-                   (if (not (plist-get buffers-to-cloc :is-many))
-                       buffers-to-cloc
-                     (plist-get buffers-to-cloc :files))))
-              (if cloc-bufs-list
-                  (with-temp-buffer
-                    (apply
-                     #'call-process cloc-executable-location nil t nil
-                     (cloc-format-command be-quiet cloc-bufs-list))
-                    (buffer-string))
-                "No filenames were found matching regex."))))
-      ;; cleanup!
-      (cl-mapc (lambda (f) (delete-file f))
-               (plist-get buffers-to-cloc :tmp-files-to-rm))
-      result-into-list)))
+      (cloc-get-output-current be-quiet)
+    (cloc-get-output-regex be-quiet regex)))
 
 (defun cloc-get-line-as-plist (line)
   "Helper function to convert a CSV-formatted LINE of cloc output.

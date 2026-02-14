@@ -87,7 +87,7 @@
 (defun cloc--format-command (be-quiet bufs-to-cloc)
   "Format the \"cloc\" command.
 
-Command will be formatteed according to BE-QUIET and the defcustom
+Command will be formatted according to BE-QUIET and the defcustom
 CLOC-USE-3RD-GEN, and run the command on the list of strings held in
 BUFS-TO-CLOC. Return the command output as a string."
   (append

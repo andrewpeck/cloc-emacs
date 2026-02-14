@@ -158,24 +158,6 @@ this function."
 (defconst cloc-url "https://cloc.sourceforge.net"
   "Url pointing to cloc's project page.")
 
-(defmacro cloc-get-temp-buffer-ref (tmp-buf-name body-in-cur body-in-tmp)
-  "Create a temporary buffer and evaluate two bodies with convenient access to it.
-
-TMP-BUF-NAME is bound to the temporary buffer object. BODY-IN-CUR is
-evaluated with the original current buffer active (while the temp buffer
-exists), allowing that code to refer to or modify the temp buffer via
-TMP-BUF-NAME. BODY-IN-TMP is then evaluated with the current buffer set
-to the temporary buffer; its value is returned. The temporary buffer is
-killed when the macro finishes."
-
-  (let ((cur-buf-sym (cl-gensym)))
-    `(let ((,cur-buf-sym (current-buffer)))
-       (with-temp-buffer
-         (let ((,tmp-buf-name (current-buffer)))
-           (with-current-buffer ,cur-buf-sym ,body-in-cur))
-         ,body-in-tmp))))
-(put 'cloc-get-temp-buffer-ref 'lisp-indent-function 1)
-
 (defun cloc-get-output (current-only be-quiet &optional regex)
   "Helper function to get cloc output for a given set of buffers.
 
@@ -190,16 +172,23 @@ aware that it will query for a regex if one is not provided by argument."
 distribution's package manager.")))
 
   (if current-only
-      ;; if prefix given, send current buffer to cloc by stdin
-      (cloc-get-temp-buffer-ref tmp-buf
-        (apply
-         #'call-process-region
-         (append
-          (list (point-min) (point-max) cloc-executable-location
-                nil tmp-buf nil)
-          (cloc-format-command be-quiet t)))
-        (buffer-string))
-    ;; if prefix given, cloc current buffer; don't ask for regex
+      ;; current only
+      (let ((src-buffer (current-buffer)))
+        (with-temp-buffer
+          (let ((tmp-buffer (current-buffer)))
+            (with-current-buffer src-buffer
+              ;; if current-buffer only given, send current buffer to cloc by stdin
+              (apply #'call-process-region
+                     (append
+                      (list (point-min) (point-max)  ; range
+                            cloc-executable-location ; executable
+                            nil                      ; don't delete region
+                            tmp-buffer               ; insert stdout into temp buffer
+                            nil)                     ; no display
+                      (cloc-format-command be-quiet t)))))
+          (buffer-string)))
+
+    ;; else query for regex
     (let* ((regex-str
             (or regex (read-regexp "file path regex: ")))
            (buffers-to-cloc

@@ -131,7 +131,7 @@ Useful if BUF is remote and cannot be read by cloc."
 If the file is not visiting a buffer (or is over a tramp connection), but
 its (buffer-name) matches REGEX, the file is written out to a temporary area. A
 plist is returned, with :files set to a list of the files which correspond to
-open buffers matching REGEX, and :tmp-files set to a list of the files which
+open buffers matching REGEX, and :tmp-files-to-rm set to a list of the files which
 have been created in the temporary area (and which should be destroyed by the
 caller of this function). An additional property :is-many is always set to t on
 the returned list so that a caller can determine whether a list was produced by
@@ -152,7 +152,7 @@ this function."
                           (cl-remove-if-not #'cloc-is-real-file matching-buffers))))
 
     (list :files ret-list
-          :tmp-files tmp-list
+          :tmp-files-to-rm tmp-list
           :is-many t)))
 
 (defconst cloc-url "https://cloc.sourceforge.net"
@@ -215,7 +215,7 @@ distribution's package manager.")))
                 "No filenames were found matching regex."))))
       ;; cleanup!
       (cl-mapc (lambda (f) (delete-file f))
-               (plist-get buffers-to-cloc :tmp-files))
+               (plist-get buffers-to-cloc :tmp-files-to-rm))
       result-into-list)))
 
 (defun cloc-get-line-as-plist (line)

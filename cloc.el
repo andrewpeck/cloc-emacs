@@ -81,7 +81,10 @@
   :type 'string
   :group 'cloc)
 
-(defun cloc-format-command (be-quiet bufs-to-cloc)
+(defconst cloc-url "https://cloc.sourceforge.net"
+  "URL pointing to cloc's project page.")
+
+(defun cloc--format-command (be-quiet bufs-to-cloc)
   "Format the \"cloc\" command.
 
 Command will be formatteed according to BE-QUIET and the defcustom
@@ -93,30 +96,30 @@ BUFS-TO-CLOC. Return the command output as a string."
    (if (eq bufs-to-cloc t) (list (concat "--stdin-name=" (buffer-name)) "-")
      bufs-to-cloc)))
 
-(defun cloc-is-tramp-or-virtual-file (buf)
+(defun cloc--is-tramp-or-virtual-file (buf)
   "Determine whether buffer BUF is a tramp or virtual file."
   (and
    (buffer-file-name buf)
-   (not (cloc-is-real-file buf))))
+   (not (cloc--is-real-file buf))))
 
-(defun cloc-is-real-file (buf)
+(defun cloc--is-real-file (buf)
   "Determine whether buffer BUF corresponds with real file matching REGEX."
   (when-let* ((buf-path (buffer-file-name buf)))
     (not (file-remote-p buf-path 'host))))
 
-(defun cloc-buffer-matches-regex (buf regex-str)
+(defun cloc--buffer-matches-regex (buf regex-str)
   "Check if BUF matches REGEX-STR."
   (when-let* ((buf (buffer-file-name buf)))
     (string-match-p regex-str buf)))
 
-(defun cloc-get-buffers-matching-regex (regex-str)
+(defun cloc--get-buffers-matching-regex (regex-str)
   "Get all buffers matching REGEX-STR."
   (thread-last
     (buffer-list)
     (cl-remove-if-not
-     (lambda (b) (cloc-buffer-matches-regex b regex-str)))))
+     (lambda (b) (cloc--buffer-matches-regex b regex-str)))))
 
-(defun cloc-make-tmp-file (buf)
+(defun cloc--make-tmp-file (buf)
   "Write a temp copy of BUF to disk.
 
 Useful if BUF is remote and cannot be read by cloc."
@@ -126,7 +129,7 @@ Useful if BUF is remote and cannot be read by cloc."
       (write-region nil nil tmp-file))
     tmp-file))
 
-(defun cloc-get-buffers-with-regex (regex-str)
+(defun cloc--get-buffers-with-regex (regex-str)
   "Loop through all open buffers for buffers visiting files matching REGEX-STR.
 If the file is not visiting a buffer (or is over a tramp connection), but
 its (buffer-name) matches REGEX, the file is written out to a temporary area. A
@@ -137,28 +140,25 @@ caller of this function). An additional property :is-many is always set to t on
 the returned list so that a caller can determine whether a list was produced by
 this function."
 
-  (let ((matching-buffers (cloc-get-buffers-matching-regex regex-str))
+  (let ((matching-buffers (cloc--get-buffers-matching-regex regex-str))
         (ret-list nil)
         (tmp-list nil))
 
     (setq tmp-list
-          (mapcar #'cloc-make-tmp-file
-                  (cl-remove-if-not #'cloc-is-tramp-or-virtual-file
+          (mapcar #'cloc--make-tmp-file
+                  (cl-remove-if-not #'cloc--is-tramp-or-virtual-file
                                     matching-buffers)))
 
     (setq ret-list
           (append tmp-list
                   (mapcar #'buffer-file-name
-                          (cl-remove-if-not #'cloc-is-real-file matching-buffers))))
+                          (cl-remove-if-not #'cloc--is-real-file matching-buffers))))
 
     (list :files ret-list
           :tmp-files-to-rm tmp-list
           :is-many t)))
 
-(defconst cloc-url "https://cloc.sourceforge.net"
-  "Url pointing to cloc's project page.")
-
-(defun cloc-get-output-current (&optional be-quiet)
+(defun cloc--get-output-current (&optional be-quiet)
   "Run cloc on current buffer. Return a string with the cloc result.
 
 BE-QUIET is passed to cloc."
@@ -175,10 +175,10 @@ BE-QUIET is passed to cloc."
                         nil                      ; don't delete region
                         tmp-buffer      ; insert stdout into temp buffer
                         nil)            ; no display
-                  (cloc-format-command be-quiet t)))))
+                  (cloc--format-command be-quiet t)))))
       (buffer-string))))
 
-(defun cloc-get-output-regex (be-quiet regex)
+(defun cloc--get-output-regex (be-quiet regex)
   "Run cloc on all buffers matching regex.
 
 Return a string with the cloc result.
@@ -194,12 +194,12 @@ BE-QUIET is passed to cloc."
           ;; name was what was intended.
           (if (string= regex-str "")
               (list (buffer-file-name))
-            (cloc-get-buffers-with-regex regex-str)))
+            (cloc--get-buffers-with-regex regex-str)))
          ;; return list so we can tell the difference between an
          ;; invalid regexp versus a real result, even though the
          ;; list always has only one element
          (result-into-list
-          ;; check if list is result of cloc-get-buffers-with-regex
+          ;; check if list is result of cloc--get-buffers-with-regex
           (let ((cloc-bufs-list
                  (if (not (plist-get buffers-to-cloc :is-many))
                      buffers-to-cloc
@@ -208,7 +208,7 @@ BE-QUIET is passed to cloc."
                 (with-temp-buffer
                   (apply
                    #'call-process cloc-executable-location nil t nil
-                   (cloc-format-command be-quiet cloc-bufs-list))
+                   (cloc--format-command be-quiet cloc-bufs-list))
                   (buffer-string))
               "No filenames were found matching regex."))))
     ;; cleanup!
@@ -216,7 +216,7 @@ BE-QUIET is passed to cloc."
              (plist-get buffers-to-cloc :tmp-files-to-rm))
     result-into-list))
 
-(defun cloc-get-output (current-only be-quiet &optional regex)
+(defun cloc--get-output (current-only be-quiet &optional regex)
   "Helper function to get cloc output for a given set of buffers.
 
 If CURRENT-ONLY is nil, get cloc output for the current buffer.
@@ -230,10 +230,10 @@ aware that it will query for a regex if one is not provided by argument."
 distribution's package manager.")))
 
   (if current-only
-      (cloc-get-output-current be-quiet)
-    (cloc-get-output-regex be-quiet regex)))
+      (cloc--get-output-current be-quiet)
+    (cloc--get-output-regex be-quiet regex)))
 
-(defun cloc-get-line-as-plist (line)
+(defun cloc--get-line-as-plist (line)
   "Helper function to convert a CSV-formatted LINE of cloc output.
 
 Return a plist representing a cloc analysis."
@@ -315,9 +315,9 @@ to the current buffer."
   (cl-remove-if
    #'not                    ; remove nils which sometimes appear for some reason
    (cl-mapcar
-    #'cloc-get-line-as-plist
+    #'cloc--get-line-as-plist
     ;; first two lines are blank line and csv header, so discard
-    (nthcdr 2 (split-string (cloc-get-output find-by-regex t regex) "\n")))))
+    (nthcdr 2 (split-string (cloc--get-output find-by-regex t regex) "\n")))))
 
 ;;;###autoload
 (defun cloc (prefix)
@@ -331,7 +331,7 @@ cloc's entire summary output is given in a *cloc* temp buffer."
   (interactive "P")
   (with-output-to-temp-buffer "*cloc*"
     (princ "\n")
-    (princ (string-replace "" "" (cloc-get-output (not prefix) nil)))))
+    (princ (string-replace "" "" (cloc--get-output (not prefix) nil)))))
 
 (provide 'cloc)
 

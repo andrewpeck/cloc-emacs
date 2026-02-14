@@ -218,6 +218,12 @@ BE-QUIET is passed to cloc."
              (plist-get buffers-to-cloc :tmp-files-to-rm))
     result-into-list))
 
+(defun cloc--check-for-exe ()
+  "Error if cloc executable is not found."
+  (unless cloc-executable-location
+    (error (concat "cloc not installed. Download it at " cloc-url " or through your
+distribution's package manager."))))
+
 (defun cloc--get-cloc-output (current-only be-quiet &optional regex)
   "Helper function to get cloc output for a given set of buffers.
 
@@ -226,10 +232,6 @@ If CURRENT-ONLY is nil, get cloc output for the current buffer.
 BE-QUIET says whether to output in CSV format, and REGEX is the optional
 regex to search through file paths with. If used programmatically, be
 aware that it will query for a regex if one is not provided by argument."
-
-  (unless cloc-executable-location
-    (error (concat "cloc not installed. Download it at " cloc-url " or through your
-distribution's package manager.")))
 
   (if current-only
       (cloc--get-cloc-output-current be-quiet)
@@ -314,6 +316,7 @@ the current buffer. If not, and REGEX is given, it will search
 file-visiting buffers for file paths matching the regex. If the regex is
 nil, it will prompt for a regex; putting in a blank there will default
 to the current buffer."
+  (cloc--check-for-exe)
   (cl-remove-if
    #'not                    ; remove nils which sometimes appear for some reason
    (cl-mapcar
@@ -331,6 +334,7 @@ If PREFIX is nil, use current buffer only.
 
 cloc's entire summary output is given in a *cloc* temp buffer."
   (interactive "P")
+  (cloc--check-for-exe)
   (with-output-to-temp-buffer "*cloc*"
     (princ "\n")
     (princ (string-replace "" "" (cloc--get-cloc-output (not prefix) nil)))))

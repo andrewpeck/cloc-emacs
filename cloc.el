@@ -160,7 +160,7 @@ by this function."
           :tmp-files-to-rm tmp-list
           :is-many t)))
 
-(defun cloc--get-output-current (&optional be-quiet)
+(defun cloc--get-cloc-output-current (&optional be-quiet)
   "Run cloc on current buffer. Return a string with the cloc result.
 
 BE-QUIET is passed to cloc."
@@ -180,7 +180,7 @@ BE-QUIET is passed to cloc."
                   (cloc--format-command be-quiet t)))))
       (buffer-string))))
 
-(defun cloc--get-output-regex (be-quiet regex)
+(defun cloc--get-cloc-output-regex (be-quiet regex)
   "Run cloc on all buffers matching regex.
 
 Return a string with the cloc result.
@@ -218,7 +218,7 @@ BE-QUIET is passed to cloc."
              (plist-get buffers-to-cloc :tmp-files-to-rm))
     result-into-list))
 
-(defun cloc--get-output (current-only be-quiet &optional regex)
+(defun cloc--get-cloc-output (current-only be-quiet &optional regex)
   "Helper function to get cloc output for a given set of buffers.
 
 If CURRENT-ONLY is nil, get cloc output for the current buffer.
@@ -232,8 +232,8 @@ aware that it will query for a regex if one is not provided by argument."
 distribution's package manager.")))
 
   (if current-only
-      (cloc--get-output-current be-quiet)
-    (cloc--get-output-regex be-quiet regex)))
+      (cloc--get-cloc-output-current be-quiet)
+    (cloc--get-cloc-output-regex be-quiet regex)))
 
 (defun cloc--get-line-as-plist (line)
   "Helper function to convert a CSV-formatted LINE of cloc output.
@@ -319,7 +319,7 @@ to the current buffer."
    (cl-mapcar
     #'cloc--get-line-as-plist
     ;; first two lines are blank line and csv header, so discard
-    (nthcdr 2 (split-string (cloc--get-output find-by-regex t regex) "\n")))))
+    (nthcdr 2 (split-string (cloc--get-cloc-output find-by-regex t regex) "\n")))))
 
 ;;;###autoload
 (defun cloc (prefix)
@@ -333,7 +333,7 @@ cloc's entire summary output is given in a *cloc* temp buffer."
   (interactive "P")
   (with-output-to-temp-buffer "*cloc*"
     (princ "\n")
-    (princ (string-replace "" "" (cloc--get-output (not prefix) nil)))))
+    (princ (string-replace "" "" (cloc--get-cloc-output (not prefix) nil)))))
 
 (provide 'cloc)
 

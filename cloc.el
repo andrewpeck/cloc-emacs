@@ -130,15 +130,17 @@ Useful if BUF is remote and cannot be read by cloc."
     tmp-file))
 
 (defun cloc--get-buffers-with-regex (regex-str)
-  "Loop through all open buffers for buffers visiting files matching REGEX-STR.
-If the file is not visiting a buffer (or is over a tramp connection), but
-its (buffer-name) matches REGEX, the file is written out to a temporary area. A
-plist is returned, with :files set to a list of the files which correspond to
-open buffers matching REGEX, and :tmp-files-to-rm set to a list of the files which
-have been created in the temporary area (and which should be destroyed by the
-caller of this function). An additional property :is-many is always set to t on
-the returned list so that a caller can determine whether a list was produced by
-this function."
+  "Return open buffers matching REGEX-STR.
+
+If the file is not visiting a buffer (or is over a tramp connection),
+but its (buffer-name) matches REGEX, the file is written out to a
+temporary area. A plist is returned, with :files set to a list of the
+files which correspond to open buffers matching REGEX, and
+:tmp-files-to-rm set to a list of the files which have been created in
+the temporary area (and which should be destroyed by the caller of this
+function). An additional property :is-many is always set to t on the
+returned list so that a caller can determine whether a list was produced
+by this function."
 
   (let ((matching-buffers (cloc--get-buffers-matching-regex regex-str))
         (ret-list nil)

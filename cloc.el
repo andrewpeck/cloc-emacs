@@ -339,6 +339,23 @@ cloc's entire summary output is given in a *cloc* temp buffer."
     (princ "\n")
     (princ (string-replace "" "" (cloc--get-cloc-output (not prefix) nil)))))
 
+(defun cloc-project ()
+  (interactive)
+  (require 'project)
+  (when-let* ((files
+               (mapcar #'shell-quote-argument
+                       (project-files (project-current))))
+              (command (string-join
+                        (append
+                         (list cloc-executable-location)
+                         files)
+                        " "))
+              (output (shell-command-to-string command)))
+
+    (with-output-to-temp-buffer "*cloc*"
+      (princ "\n")
+      (princ output))))
+
 (provide 'cloc)
 
 ;;; cloc.el ends here

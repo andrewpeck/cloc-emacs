@@ -202,17 +202,16 @@ BE-QUIET is passed to cloc."
          ;; list always has only one element
          (result-into-list
           ;; check if list is result of cloc--get-buffers-with-regex
-          (let ((cloc-bufs-list
-                 (if (not (plist-get buffers-to-cloc :is-many))
-                     buffers-to-cloc
-                   (plist-get buffers-to-cloc :files))))
-            (if cloc-bufs-list
-                (with-temp-buffer
-                  (apply
-                   #'call-process cloc-executable-location nil t nil
-                   (cloc--format-command be-quiet cloc-bufs-list))
-                  (buffer-string))
-              "No filenames were found matching regex."))))
+          (if-let* ((cloc-bufs-list
+                     (if (not (plist-get buffers-to-cloc :is-many))
+                         buffers-to-cloc
+                       (plist-get buffers-to-cloc :files))))
+              (with-temp-buffer
+                (apply
+                 #'call-process cloc-executable-location nil t nil
+                 (cloc--format-command be-quiet cloc-bufs-list))
+                (buffer-string))
+            "No filenames were found matching regex.")))
     ;; cleanup!
     (cl-mapc (lambda (f) (delete-file f))
              (plist-get buffers-to-cloc :tmp-files-to-rm))
